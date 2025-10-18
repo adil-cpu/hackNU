@@ -54,9 +54,12 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             // 3. Получаем ответ от n8n
-            // Мы ожидаем, что n8n вернет JSON вида: {"reply": "Текст ответа..."}
             const data = await response.json();
-            const botReply = data.reply || "Извините, у меня нет ответа.";
+            
+            // --- !!! ВОТ ИЗМЕНЕНИЕ !!! ---
+            // Мы берем [0]-й элемент, а ?. защищает от ошибки, если data = []
+            const botReply = data?.[0]?.reply || "Извините, у меня нет ответа.";
+            // -----------------------------
 
             // 4. Убираем "Печатает..." и показываем ответ бота
             const loadingIndicator = document.querySelector(".bot-loading");
@@ -72,7 +75,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if (loadingIndicator) {
                 loadingIndicator.remove();
             }
-            addMessage(`Произошла ошибка: ${error.message}. Попробуйте еще раз.`, "bot");
+            // Обрабатываем ошибку JSON.parse, если n8n вернул пустую строку
+            if (error instanceof SyntaxError) {
+                addMessage("Произошла ошибка: получен пустой ответ от сервера. Проверьте воркфлоу.", "bot");
+            } else {
+                addMessage(`Произошла ошибка: ${error.message}. Попробуйте еще раз.`, "bot");
+            }
         }
     }
 
@@ -104,7 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
         recognition.onend = () => {
             micBtn.classList.remove("recording"); // Возвращаем обычный цвет
             micBtn.disabled = false;
-        };
+        }
 
         // Обработка ошибок
         recognition.onerror = (event) => {
