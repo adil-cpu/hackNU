@@ -4,7 +4,166 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zaman Bank AI Assistant</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Базовые стили */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Контейнер чата */
+        .chat-container {
+            width: 95%;
+            max-width: 420px;
+            height: 90vh;
+            max-height: 750px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Заголовок чата */
+        .chat-header {
+            background: linear-gradient(90deg, rgba(0,102,102,1) 0%, rgba(0,128,128,1) 100%);
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+        .chat-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+        .chat-header p {
+            margin: 5px 0 0;
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
+        /* Окно сообщений */
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Стили для сообщений */
+        .message {
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 80%;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            white-space: pre-wrap; /* Сохраняет абзацы */
+        }
+
+        /* Сообщение бота */
+        .message.bot {
+            background-color: #e9eef2;
+            color: #333;
+            border-bottom-left-radius: 4px;
+            align-self: flex-start;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .message-text {
+            flex-grow: 1;
+        }
+
+        /* Сообщение пользователя */
+        .message.user {
+            background-color: #0078d4;
+            color: white;
+            border-bottom-right-radius: 4px;
+            align-self: flex-end;
+        }
+
+        /* Индикатор загрузки */
+        .message.bot-loading {
+            background-color: #e9eef2;
+            color: #777;
+            font-style: italic;
+            border-bottom-left-radius: 4px;
+            align-self: flex-start;
+        }
+
+        /* Форма ввода */
+        .chat-input-form {
+            display: flex;
+            align-items: center;
+            border-top: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f9f9f9;
+            flex-shrink: 0;
+        }
+
+        #user-input {
+            flex-grow: 1;
+            border: 1px solid transparent;
+            padding: 12px;
+            border-radius: 20px;
+            background-color: #eef2f5;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.2s ease-in-out;
+        }
+
+        #user-input:focus {
+            background-color: #fff;
+            border-color: #0078d4;
+        }
+
+        /* Кнопки */
+        #send-btn, #mic-btn {
+            border: none;
+            background-color: transparent;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0 10px;
+            color: #555;
+            transition: color 0.2s, transform 0.2s;
+        }
+        
+        #send-btn {
+            color: #0078d4;
+            margin-left: 5px;
+        }
+
+        #mic-btn:hover, #send-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        /* Иконка микрофона */
+        #mic-btn::before {
+            content: '🎤';
+        }
+
+        /* Стиль для активного микрофона */
+        #mic-btn.recording {
+            color: #d90429;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+    </style>
 </head>
 <body>
     <div class="chat-container">
@@ -14,15 +173,162 @@
         </div>
         <div class="chat-messages" id="chat-messages">
             <div class="message bot">
-                Привет! Я ваш финансовый ассистент на базе AI. Я могу помочь вам с финансовыми целями, подбором продуктов и многим другим. Чем могу помочь?
+                 <span class="message-text">Здравствуйте! Я ваш финансовый ассистент на базе AI. Я могу помочь вам с финансовыми целями, подбором продуктов и многим другим. Чем могу помочь?</span>
             </div>
         </div>
         <div class="chat-input-form">
-            <button id="mic-btn">🎙️</button>
+            <button id="mic-btn" title="Голосовой ввод"></button>
             <input type="text" id="user-input" placeholder="Введите ваш запрос...">
-            <button id="send-btn">➤</button>
+            <button id="send-btn" title="Отправить">➤</button>
         </div>
     </div>
-    <script src="app.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const chatMessages = document.getElementById("chat-messages");
+            const userInput = document.getElementById("user-input");
+            const sendBtn = document.getElementById("send-btn");
+            const micBtn = document.getElementById("mic-btn");
+
+            const N8N_WEBHOOK_URL = "https://unreplete-kash-singly.ngrok-free.dev/webhook/5ac114ab-2b53-4dec-b78f-af8321a14c6a";
+
+            /**
+             * Добавляет сообщение в окно чата
+             * @param {string} text - Текст сообщения
+             * @param {'user' | 'bot' | 'bot-loading'} sender - Отправитель
+             */
+            function addMessage(text, sender) {
+                const messageDiv = document.createElement("div");
+                messageDiv.classList.add("message", sender);
+
+                const textSpan = document.createElement("span");
+                textSpan.classList.add("message-text");
+                textSpan.textContent = text;
+                messageDiv.appendChild(textSpan);
+                
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            /**
+             * Озвучивает текст
+             * @param {string} text - Текст для озвучивания
+             */
+            function speakMessage(text) {
+                // Останавливаем предыдущее воспроизведение, если оно есть
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ru-RU'; // Устанавливаем русский язык
+                window.speechSynthesis.speak(utterance);
+            }
+
+            /**
+             * Отправляет сообщение боту и получает ответ
+             */
+            async function handleSendMessage() {
+                const messageText = userInput.value.trim();
+                if (messageText === "") return;
+
+                addMessage(messageText, "user");
+                userInput.value = "";
+                userInput.focus();
+                
+                addMessage("Печатает...", "bot-loading");
+
+                try {
+                    const response = await fetch(N8N_WEBHOOK_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ message: messageText }),
+                    });
+
+                    const loadingIndicator = document.querySelector(".bot-loading");
+                    if(loadingIndicator) loadingIndicator.remove();
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    const botReply = data?.[0]?.reply || "Извините, у меня нет ответа.";
+
+                    addMessage(botReply, "bot");
+                    speakMessage(botReply); // Озвучиваем ответ бота
+
+                } catch (error) {
+                    console.error("Ошибка при обращении к n8n:", error);
+                    const loadingIndicator = document.querySelector(".bot-loading");
+                    if (loadingIndicator) loadingIndicator.remove();
+                    
+                    let errorMessage = `Произошла ошибка: ${error.message}. Попробуйте еще раз.`;
+                    if (error instanceof SyntaxError) {
+                        errorMessage = "Произошла ошибка: получен некорректный ответ от сервера. Проверьте воркфлоу.";
+                    }
+                    addMessage(errorMessage, "bot");
+                }
+            }
+
+            // --- ЛОГИКА ГОЛОСОВОГО ВВОДА ---
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            let recognition = null;
+
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.lang = 'ru-RU';
+                recognition.interimResults = false;
+
+                micBtn.addEventListener("click", () => {
+                    if (micBtn.classList.contains("recording")) {
+                        recognition.stop();
+                    } else {
+                        recognition.start();
+                    }
+                });
+
+                recognition.onstart = () => {
+                    micBtn.classList.add("recording");
+                    micBtn.disabled = true;
+                };
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    userInput.value = transcript;
+                    handleSendMessage();
+                };
+
+                recognition.onend = () => {
+                    micBtn.classList.remove("recording");
+                    micBtn.disabled = false;
+                };
+
+                recognition.onerror = (event) => {
+                    console.error("Ошибка распознавания речи:", event.error);
+                    if (event.error === 'no-speech') {
+                         addMessage("Я вас не расслышал. Попробуйте еще раз.", "bot");
+                    }
+                };
+            } else {
+                console.warn("Web Speech API не поддерживается в этом браузере.");
+                micBtn.style.display = "none";
+            }
+
+            // --- Навешиваем события ---
+            sendBtn.addEventListener("click", handleSendMessage);
+            userInput.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSendMessage();
+                }
+            });
+
+            // Озвучиваем первое приветственное сообщение
+            const initialBotMessage = document.querySelector('.message.bot .message-text')?.textContent;
+            if (initialBotMessage) {
+                // Небольшая задержка, чтобы браузер успел инициализировать API
+                setTimeout(() => speakMessage(initialBotMessage), 500);
+            }
+        });
+    </script>
 </body>
 </html>
