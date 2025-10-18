@@ -1,153 +1,143 @@
 document.addEventListener("DOMContentLoaded", () => {
-    // Получаем элементы DOM
+    // Получаем все нужные элементы со страницы
     const chatMessages = document.getElementById("chat-messages");
     const userInput = document.getElementById("user-input");
     const sendBtn = document.getElementById("send-btn");
     const micBtn = document.getElementById("mic-btn");
 
     // --- !!! ВАШ URL ИЗ N8N !!! ---
+    // Это URL, который вы скопировали из ноды "Webhook" в n8n
     const N8N_WEBHOOK_URL = "https://unreplete-kash-singly.ngrok-free.dev/webhook/5ac114ab-2b53-4dec-b78f-af8321a14c6a";
-
-    /**
-     * Озвучивает переданный текст с помощью Web Speech API
-     * @param {string} text - Текст для озвучивания
-     */
-    function speak(text) {
-        if ('speechSynthesis' in window) {
-            // Останавливаем предыдущее воспроизведение, если оно есть
-            window.speechSynthesis.cancel();
-
-            const utterance = new SpeechSynthesisUtterance(text);
-            
-            // Попытка найти и установить русский голос
-            const voices = window.speechSynthesis.getVoices();
-            const russianVoice = voices.find(voice => voice.lang === 'ru-RU');
-            if (russianVoice) {
-                utterance.voice = russianVoice;
-            } else {
-                 console.warn("Русский голос не найден, будет использован голос по умолчанию.");
-            }
-            
-            window.speechSynthesis.speak(utterance);
-        } else {
-            console.warn("Speech Synthesis API не поддерживается в этом браузере.");
-        }
-    }
-
-    // Если голоса загружаются асинхронно
-    if ('onvoiceschanged' in window.speechSynthesis) {
-        window.speechSynthesis.onvoiceschanged = () => {
-            // Эта функция вызовется, когда голоса будут готовы
-        };
-    }
+    // ---------------------------------
 
     /**
      * Добавляет сообщение в окно чата
      * @param {string} text - Текст сообщения
-     * @param {'user' | 'bot' | 'bot-loading'} sender - Отправитель
+     * @param {'user' | 'bot'} sender - Отправитель ('user' или 'bot')
      */
     function addMessage(text, sender) {
         const messageDiv = document.createElement("div");
         messageDiv.classList.add("message", sender);
         messageDiv.textContent = text;
         chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight; // Автопрокрутка
+        // Автоматически прокручиваем чат вниз
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     /**
-     * Отправляет сообщение боту и получает ответ
+     * Отправляет сообщение боту (в n8n) и получает ответ
      */
     async function handleSendMessage() {
         const messageText = userInput.value.trim();
         if (messageText === "") return;
 
+        // 1. Отображаем сообщение пользователя в чате
         addMessage(messageText, "user");
-        userInput.value = "";
-        userInput.focus();
+        userInput.value = ""; // Очищаем поле ввода
         
+        // Показываем индикатор загрузки (можно добавить)
         addMessage("Печатает...", "bot-loading");
 
+        // 2. Отправляем запрос на Webhook n8n
         try {
             const response = await fetch(N8N_WEBHOOK_URL, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: messageText }),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                // n8n будет ожидать JSON в таком формате
+                body: JSON.stringify({ message: messageText }), 
             });
 
-            const loadingIndicator = document.querySelector(".bot-loading");
-            if(loadingIndicator) loadingIndicator.remove();
-
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
+            // 3. Получаем ответ от n8n
             const data = await response.json();
+            
+            // --- !!! ВОТ ИЗМЕНЕНИЕ !!! ---
+            // Мы берем [0]-й элемент, а ?. защищает от ошибки, если data = []
             const botReply = data?.[0]?.reply || "Извините, у меня нет ответа.";
+            // -----------------------------
 
+            // 4. Убираем "Печатает..." и показываем ответ бота
+            const loadingIndicator = document.querySelector(".bot-loading");
+            if (loadingIndicator) {
+                loadingIndicator.remove();
+            }
             addMessage(botReply, "bot");
-            speak(botReply); // Озвучиваем ответ бота
 
         } catch (error) {
-            console.error("Ошибка при обращении к бэкенду:", error);
+            console.error("Ошибка при обращении к n8n:", error);
+            // Убираем "Печатает..." и показываем ошибку
             const loadingIndicator = document.querySelector(".bot-loading");
-            if (loadingIndicator) loadingIndicator.remove();
-            
-            let errorMessage = `Произошла ошибка: ${error.message}. Попробуйте еще раз.`;
-            if (error instanceof SyntaxError) {
-                errorMessage = "Произошла ошибка: получен некорректный ответ от сервера.";
+            if (loadingIndicator) {
+                loadingIndicator.remove();
             }
-            addMessage(errorMessage, "bot");
+            // Обрабатываем ошибку JSON.parse, если n8n вернул пустую строку
+            if (error instanceof SyntaxError) {
+                addMessage("Произошла ошибка: получен пустой ответ от сервера. Проверьте воркфлоу.", "bot");
+            } else {
+                addMessage(`Произошла ошибка: ${error.message}. Попробуйте еще раз.`, "bot");
+            }
         }
     }
 
     // --- ЛОГИКА ГОЛОСОВОГО ВВОДА (Web Speech API) ---
+
+    // Проверяем, поддерживает ли браузер SpeechRecognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = null;
 
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
-        recognition.lang = 'ru-RU';
-        recognition.interimResults = false;
+        recognition.lang = 'ru-RU'; // Устанавливаем язык
+        recognition.interimResults = false; // Нам нужен только финальный результат
 
         micBtn.addEventListener("click", () => {
-            if (micBtn.classList.contains("recording")) {
-                recognition.stop();
-            } else {
-                recognition.start();
-            }
+            micBtn.classList.add("recording"); // Делаем кнопку красной
+            micBtn.disabled = true;
+            recognition.start();
         });
 
-        recognition.onstart = () => {
-            micBtn.classList.add("recording");
-            window.speechSynthesis.cancel(); // Останавливаем речь ассистента, если он говорит
-        };
-
+        // Когда речь распознана
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
-            userInput.value = transcript;
-            handleSendMessage();
+            userInput.value = transcript; // Вставляем распознанный текст в поле
+            handleSendMessage(); // Сразу отправляем сообщение
         };
 
+        // Когда распознавание закончено (или по таймауту)
         recognition.onend = () => {
-            micBtn.classList.remove("recording");
-        };
+            micBtn.classList.remove("recording"); // Возвращаем обычный цвет
+            micBtn.disabled = false;
+        }
 
+        // Обработка ошибок
         recognition.onerror = (event) => {
             console.error("Ошибка распознавания речи:", event.error);
+            micBtn.classList.remove("recording");
+            micBtn.disabled = false;
             if (event.error === 'no-speech') {
                  addMessage("Я вас не расслышал. Попробуйте еще раз.", "bot");
             }
         };
+
     } else {
+        // Если API не поддерживается, прячем кнопку микрофона
         console.warn("Web Speech API не поддерживается в этом браузере.");
         micBtn.style.display = "none";
     }
 
-    // --- Назначаем обработчики событий ---
+    // --- Навешиваем события ---
+    
+    // Нажатие на кнопку "Отправить"
     sendBtn.addEventListener("click", handleSendMessage);
+
+    // Нажатие на "Enter" в поле ввода
     userInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") {
-            e.preventDefault();
             handleSendMessage();
         }
     });
