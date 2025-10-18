@@ -9,6 +9,39 @@ document.addEventListener("DOMContentLoaded", () => {
     const N8N_WEBHOOK_URL = "https://unreplete-kash-singly.ngrok-free.dev/webhook/5ac114ab-2b53-4dec-b78f-af8321a14c6a";
 
     /**
+     * Озвучивает переданный текст с помощью Web Speech API
+     * @param {string} text - Текст для озвучивания
+     */
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            // Останавливаем предыдущее воспроизведение, если оно есть
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Попытка найти и установить русский голос
+            const voices = window.speechSynthesis.getVoices();
+            const russianVoice = voices.find(voice => voice.lang === 'ru-RU');
+            if (russianVoice) {
+                utterance.voice = russianVoice;
+            } else {
+                 console.warn("Русский голос не найден, будет использован голос по умолчанию.");
+            }
+            
+            window.speechSynthesis.speak(utterance);
+        } else {
+            console.warn("Speech Synthesis API не поддерживается в этом браузере.");
+        }
+    }
+
+    // Если голоса загружаются асинхронно
+    if ('onvoiceschanged' in window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = () => {
+            // Эта функция вызовется, когда голоса будут готовы
+        };
+    }
+
+    /**
      * Добавляет сообщение в окно чата
      * @param {string} text - Текст сообщения
      * @param {'user' | 'bot' | 'bot-loading'} sender - Отправитель
@@ -41,7 +74,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify({ message: messageText }),
             });
 
-            // Удаляем индикатор загрузки
             const loadingIndicator = document.querySelector(".bot-loading");
             if(loadingIndicator) loadingIndicator.remove();
 
@@ -53,6 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const botReply = data?.[0]?.reply || "Извините, у меня нет ответа.";
 
             addMessage(botReply, "bot");
+            speak(botReply); // Озвучиваем ответ бота
 
         } catch (error) {
             console.error("Ошибка при обращении к бэкенду:", error);
@@ -86,12 +119,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         recognition.onstart = () => {
             micBtn.classList.add("recording");
+            window.speechSynthesis.cancel(); // Останавливаем речь ассистента, если он говорит
         };
 
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
             userInput.value = transcript;
-            // Сразу отправляем распознанный текст
             handleSendMessage();
         };
 
@@ -107,14 +140,14 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     } else {
         console.warn("Web Speech API не поддерживается в этом браузере.");
-        micBtn.style.display = "none"; // Прячем кнопку, если API нет
+        micBtn.style.display = "none";
     }
 
     // --- Назначаем обработчики событий ---
     sendBtn.addEventListener("click", handleSendMessage);
     userInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") {
-            e.preventDefault(); // Предотвращаем стандартное поведение Enter
+            e.preventDefault();
             handleSendMessage();
         }
     });
