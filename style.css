@@ -11,12 +11,13 @@ body {
 
 /* Контейнер чата */
 .chat-container {
-    width: 400px;
+    width: 95%;
+    max-width: 420px;
     height: 90vh;
-    max-height: 700px;
+    max-height: 750px;
     background-color: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -24,11 +25,12 @@ body {
 
 /* Заголовок чата */
 .chat-header {
-    background: linear-gradient(90deg, rgba(0,102,102,1) 0%, rgba(0,128,128,1) 100%); /* Фирменный цвет Zaman? */
+    background: linear-gradient(90deg, rgba(0,102,102,1) 0%, rgba(0,128,128,1) 100%);
     color: white;
     padding: 15px 20px;
     text-align: center;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    flex-shrink: 0;
 }
 .chat-header h2 {
     margin: 0;
@@ -54,12 +56,12 @@ body {
 .message {
     padding: 10px 15px;
     border-radius: 18px;
-    max-width: 75%;
-    line-height: 1.4;
+    max-width: 80%;
+    line-height: 1.5;
     font-size: 0.95rem;
+    white-space: pre-wrap;
 }
 
-/* Сообщение бота */
 .message.bot {
     background-color: #e9eef2;
     color: #333;
@@ -67,58 +69,79 @@ body {
     align-self: flex-start;
 }
 
-/* Сообщение пользователя */
 .message.user {
-    background-color: #0078d4; /* Яркий цвет для пользователя */
+    background-color: #0078d4;
     color: white;
     border-bottom-right-radius: 4px;
     align-self: flex-end;
 }
 
+.message.bot-loading {
+    background-color: #e9eef2;
+    color: #777;
+    font-style: italic;
+}
+
 /* Форма ввода */
 .chat-input-form {
     display: flex;
+    align-items: center;
     border-top: 1px solid #ddd;
     padding: 10px;
     background-color: #f9f9f9;
+    flex-shrink: 0;
 }
 
 #user-input {
     flex-grow: 1;
-    border: none;
+    border: 1px solid transparent;
     padding: 12px;
     border-radius: 20px;
     background-color: #eef2f5;
     font-size: 1rem;
     outline: none;
+    transition: all 0.2s ease-in-out;
 }
 
 #user-input:focus {
     background-color: #fff;
-    border: 1px solid #0078d4;
-    padding-left: 11px; /* Компенсация рамки */
+    border-color: #0078d4;
 }
 
 /* Кнопки */
 #send-btn, #mic-btn {
     border: none;
     background-color: transparent;
-    font-size: 1.5rem;
     cursor: pointer;
     padding: 0 10px;
     color: #555;
-    transition: color 0.2s;
+    transition: color 0.2s, transform 0.2s;
 }
 
 #send-btn {
+    font-size: 1.5rem;
     color: #0078d4;
+    margin-left: 5px;
+}
+
+/* Иконка микрофона */
+#mic-btn::before {
+    content: '🎤';
+    font-size: 1.5rem;
 }
 
 #mic-btn:hover, #send-btn:hover {
-    color: #005a9e;
+    transform: scale(1.1);
 }
 
 /* Стиль для активного микрофона */
 #mic-btn.recording {
-    color: #d90429; /* Ярко-красный */
+    color: #d90429;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
 }
